@@ -1,5 +1,8 @@
 import customtkinter as ctk
 import tkinter as tk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from fisica import calcular_trajetoria
 
 
 # ============================================================
@@ -277,36 +280,40 @@ class Aplicativo(ctk.CTk):
         # CONTROLES
         # --------------------------------------------------------
 
-        self.criar_controle(
+        self.slider_velocidade = self.criar_controle (
             "Velocidade inicial v₀",
             30,
             5,
             150,
-            "m/s"
+            "m/s",
+        comando = self.atualizar_grafico
         )
 
-        self.criar_controle(
+        self.slider_angulo = self.criar_controle(
             "Ângulo de lançamento ω",
             45,
             1,
             89,
-            "°"
+            "°",
+            comando = self.atualizar_grafico
         )
 
-        self.criar_controle(
+        self.slider_altura = self.criar_controle(
             "Altura inicial y₀",
             5,
             0,
             50,
-            "m"
+            "m",
+            comando=self.atualizar_grafico
         )
 
-        self.criar_controle(
+        self.slider_gravidade = self.criar_controle(
             "Aceleração da gravidade g",
             9.81,
             1.6,
             24.8,
-            "m/s²"
+            "m/s²",
+            comando=self.atualizar_grafico
         )
 
         ctk.CTkLabel(
@@ -400,7 +407,8 @@ class Aplicativo(ctk.CTk):
             corner_radius=9,
             fg_color="#19A83B",
             hover_color="#13852F",
-            font=ctk.CTkFont(size=14, weight="bold")
+            font=ctk.CTkFont(size=14, weight="bold"),
+            command = self.mostrar_velocidade
         )
         self.btn_lancar.pack(
             fill="x",
@@ -477,11 +485,30 @@ class Aplicativo(ctk.CTk):
             pady=(5, 18),
             sticky="nsew"
         )
-
-        self.area_grafico.bind(
-            "<Configure>",
-            self.desenhar_grafico
+        #ADIONANDO O GRÁFICO DO MATPLOTLIB
+        self.figura, self.ax = plt.subplots()
+        xs, ys, tempos = calcular_trajetoria(
+            v0=30,
+            angulo=45,
+            y0=5,
+            g=9.81
         )
+
+        self.ax.plot(xs,ys)
+        self.ax.set_xlabel("Distancia Horizontal (m)")
+        self.ax.set_ylabel("Altura (m)")
+        self.ax.set_title("Trajetória do projétil")
+
+        self.canvas = FigureCanvasTkAgg(
+            self.figura,
+            master = self.area_grafico
+        )
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(
+            fill="both",
+            expand=True
+        )
+
 
     # ============================================================
     # CRIA CONTROLE
@@ -493,7 +520,8 @@ class Aplicativo(ctk.CTk):
         valor_inicial,
         minimo,
         maximo,
-        unidade
+        unidade,
+        comando=None
     ):
         ctk.CTkLabel(
             self.controles,
@@ -521,7 +549,8 @@ class Aplicativo(ctk.CTk):
             linha,
             from_=minimo,
             to=maximo,
-            height=18
+            height=18,
+            command=comando
         )
         slider.set(valor_inicial)
         slider.grid(
@@ -556,6 +585,38 @@ class Aplicativo(ctk.CTk):
             padx=24,
             pady=(1, 9)
         )
+
+        return slider
+
+    def mostrar_velocidade(self):
+        print("velocidade", self.slider_velocidade.get())
+
+    #=============================================================
+    # ATUALIZANDO O GRÁFICO
+    #=============================================================
+
+    def atualizar_grafico(self, valor=None):
+        velocidade = self.slider_velocidade.get()
+        angulo = self.slider_angulo.get()
+        altura = self.slider_altura.get()
+        gravidade = self.slider_gravidade.get()
+
+        xs,ys,tempos = calcular_trajetoria(
+            v0=velocidade,
+            angulo=angulo,
+            y0 =altura,
+            g=gravidade
+        )
+
+        self.ax.clear()
+
+        self.ax.plot(xs,ys)
+
+        self.ax.set_xlabel("Distância horizontal (m)")
+        self.ax.set_ylabel("Altura (m)")
+        self.ax.set_title("Trajetória do Projétil")
+
+        self.canvas.draw()
 
     # ============================================================
     # RESULTADO
@@ -594,237 +655,6 @@ class Aplicativo(ctk.CTk):
             pady=(0, 8)
         )
 
-    # ============================================================
-    # GRÁFICO ESTÁTICO
-    # ============================================================
-
-    def desenhar_grafico(self, event=None):
-        """
-        Desenha somente uma representação visual estática.
-
-        NÃO há cálculo físico nesta função.
-        Ela serve apenas para a interface ficar parecida com
-        a versão final desejada.
-        """
-
-        canvas = self.area_grafico
-        canvas.delete("all")
-
-        largura = canvas.winfo_width()
-        altura = canvas.winfo_height()
-
-        if largura < 100 or altura < 100:
-            return
-
-        # Área interna do gráfico
-        esquerda = 95
-        direita = largura - 55
-        topo = 80
-        baixo = altura - 70
-
-        # Grade
-        for i in range(6):
-            x = esquerda + (direita - esquerda) * i / 5
-            canvas.create_line(
-                x,
-                topo,
-                x,
-                baixo,
-                fill="#303030"
-            )
-
-        for i in range(6):
-            y = baixo - (baixo - topo) * i / 5
-            canvas.create_line(
-                esquerda,
-                y,
-                direita,
-                y,
-                fill="#303030"
-            )
-
-        # Eixos
-        canvas.create_line(
-            esquerda,
-            baixo,
-            direita,
-            baixo,
-            fill="#777777",
-            width=1
-        )
-
-        canvas.create_line(
-            esquerda,
-            baixo,
-            esquerda,
-            topo,
-            fill="#777777",
-            width=1
-        )
-
-        # Escala aproximada apenas para desenho
-        valores_x = [0, 20, 40, 60, 80, 100]
-        valores_y = [0, 10, 20, 30, 40, 50]
-
-        for i, valor in enumerate(valores_x):
-            x = esquerda + (direita - esquerda) * i / 5
-
-            canvas.create_text(
-                x,
-                baixo + 18,
-                text=str(valor),
-                fill="#AAAAAA",
-                font=("Arial", 9)
-            )
-
-        for i, valor in enumerate(valores_y):
-            y = baixo - (baixo - topo) * i / 5
-
-            canvas.create_text(
-                esquerda - 25,
-                y,
-                text=str(valor),
-                fill="#AAAAAA",
-                font=("Arial", 9)
-            )
-
-        # Título dos eixos
-        canvas.create_text(
-            (esquerda + direita) / 2,
-            baixo + 45,
-            text="Distância horizontal (m)",
-            fill="#DDDDDD",
-            font=("Arial", 10)
-        )
-
-        canvas.create_text(
-            25,
-            (topo + baixo) / 2,
-            text="Altura (m)",
-            fill="#DDDDDD",
-            angle=90,
-            font=("Arial", 10)
-        )
-
-        # --------------------------------------------------------
-        # TRAJETÓRIA ESTÁTICA
-        # --------------------------------------------------------
-
-        pontos = []
-
-        for i in range(81):
-            x = 95 * i / 80
-            y = 4 + 25 * 4 * x * (1 - x)
-
-            px = esquerda + (direita - esquerda) * i / 80
-            py = baixo - (baixo - topo) * y / 50
-
-            pontos.extend([px, py])
-
-        canvas.create_line(
-            *pontos,
-            fill="#2585C4",
-            width=3,
-            smooth=True
-        )
-
-        # Ponto inicial
-        px0 = pontos[0]
-        py0 = pontos[1]
-
-        canvas.create_oval(
-            px0 - 6,
-            py0 - 6,
-            px0 + 6,
-            py0 + 6,
-            fill="#2CA02C",
-            outline=""
-        )
-
-        # Ponto do projétil
-        indice = 42 * 2
-
-        pxa = pontos[indice]
-        pya = pontos[indice + 1]
-
-        canvas.create_oval(
-            pxa - 7,
-            pya - 7,
-            pxa + 7,
-            pya + 7,
-            fill="#FF7F0E",
-            outline=""
-        )
-
-        # --------------------------------------------------------
-        # LEGENDA
-        # --------------------------------------------------------
-
-        legenda_x = direita - 130
-        legenda_y = topo + 18
-
-        canvas.create_rectangle(
-            legenda_x,
-            legenda_y,
-            direita - 8,
-            legenda_y + 95,
-            fill="#222222",
-            outline="#444444"
-        )
-
-        canvas.create_line(
-            legenda_x + 10,
-            legenda_y + 18,
-            legenda_x + 35,
-            legenda_y + 18,
-            fill="#2585C4",
-            width=3
-        )
-
-        canvas.create_text(
-            legenda_x + 43,
-            legenda_y + 18,
-            text="Trajetória atual",
-            anchor="w",
-            fill="#DDDDDD",
-            font=("Arial", 9)
-        )
-
-        canvas.create_oval(
-            legenda_x + 10,
-            legenda_y + 34,
-            legenda_x + 22,
-            legenda_y + 46,
-            fill="#FF7F0E",
-            outline=""
-        )
-
-        canvas.create_text(
-            legenda_x + 30,
-            legenda_y + 40,
-            text="Projétil",
-            anchor="w",
-            fill="#DDDDDD",
-            font=("Arial", 9)
-        )
-
-        canvas.create_oval(
-            legenda_x + 10,
-            legenda_y + 56,
-            legenda_x + 22,
-            legenda_y + 68,
-            fill="#2CA02C",
-            outline=""
-        )
-
-        canvas.create_text(
-            legenda_x + 30,
-            legenda_y + 62,
-            text="Ponto inicial",
-            anchor="w",
-            fill="#DDDDDD",
-            font=("Arial", 9)
-        )
 
 
 # ================================================================
